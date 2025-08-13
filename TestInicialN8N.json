@@ -1,0 +1,170 @@
+{
+  "name": "TestInicialN8N",
+  "nodes": [
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "http://ollama:11434/api/generate",
+        "responseFormat": "string",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "{\n  \"model\": \"mistral\",\n  \"prompt\": \"Hola, genera un mensaje de prueba para n8n\",\n  \"max_tokens\": 100\n}"
+      },
+      "name": "Ollama Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -272,
+        224
+      ],
+      "id": "5aa7acc7-e247-4ee5-9c14-375d3f116d81"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Nodo que parsea NDJSON y concatena texto\nconst ndjson = items[0].json.data;\nconst lines = ndjson.trim().split('\\n');\nlet finalText = '';\n\nfor (const line of lines) {\n  const obj = JSON.parse(line);\n  if (obj.response) finalText += obj.response;\n}\n\nreturn [{ json: { text: finalText } }];"
+      },
+      "name": "Parse NDJSON",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -112,
+        224
+      ],
+      "id": "a29a1983-3d36-4738-8b18-fbb52fa6ec99"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "debugText",
+              "value": "={{$json[\"text\"]}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Debug Node",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        64,
+        64
+      ],
+      "id": "b2010d2d-ab99-407b-9d1e-eaac183bb11d"
+    },
+    {
+      "parameters": {
+        "chatId": "-1002828499048",
+        "text": "={{$json[\"text\"]}}",
+        "additionalFields": {}
+      },
+      "name": "Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        64,
+        224
+      ],
+      "id": "2a2f3077-45a6-4bf6-84c0-1a0c4f48ecdf",
+      "webhookId": "11aad8ba-075e-4f0a-bfc3-14aa8908f9aa",
+      "credentials": {
+        "telegramApi": {
+          "id": "HJuPsXzOYy7xHewC",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "danielau@softclass.co",
+        "toEmail": "piedecuestadigital@gmail.com",
+        "subject": "Mensaje desde Ollama NDJSON",
+        "text": "={{$json[\"text\"]}}",
+        "options": {}
+      },
+      "name": "Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        64,
+        368
+      ],
+      "id": "4d502de9-884d-4592-91e8-4fdafd499b66",
+      "credentials": {
+        "smtp": {
+          "id": "y9YbrVwPMbQjuDhY",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -432,
+        224
+      ],
+      "id": "c78d7181-1f2e-4809-bd19-3624aa50d065",
+      "name": "When clicking ‘Execute workflow’"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Ollama Request": {
+      "main": [
+        [
+          {
+            "node": "Parse NDJSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse NDJSON": {
+      "main": [
+        [
+          {
+            "node": "Debug Node",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Telegram",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Ollama Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "86ceb8cd-2afb-47d2-a75c-318a0e45d37d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "359c20ed7f3f024c6040110616854796ffe56ae4b98ee71dd6c83f82444ad2ef"
+  },
+  "id": "ZINgl0U8nMTqN2Ue",
+  "tags": []
+}

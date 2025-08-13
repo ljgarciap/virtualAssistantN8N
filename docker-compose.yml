@@ -1,0 +1,21 @@
+services:
+  ollama:
+    build: .
+    ports:
+      - "${OLLAMA_PORT}:11434"
+    environment:
+      - OLLAMA_MODEL=${OLLAMA_MODEL}
+    volumes:
+      - ./ollama_data:/root/.ollama
+
+  n8n:
+    image: n8nio/n8n
+    ports:
+      - "${N8N_PORT}:5678"
+    environment:
+      - N8N_HOST=n8n
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+    volumes:
+      - ${N8N_DATA}:/home/node/.n8n
