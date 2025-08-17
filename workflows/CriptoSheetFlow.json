@@ -59,7 +59,7 @@
         "url": "https://sheets.googleapis.com/v4/spreadsheets/SPREADSHEET_ID/values/'Hoja 1'!A:A:append?valueInputOption=USER_ENTERED",
         "sendHeaders": true,
         "specifyHeaders": "json",
-        "jsonHeaders": "={\n  \"Authorization\": \"Bearer ya29.a0AS3H6NzIqWFXWvc0ERHgDU5A_ouAnvEXWswsJbeOngXfqTY4C__wF64PnixEeVXhb6JaXg9wr_dkR2twsxwdQSjkRFi36L6kCfmA6PgMd9zKCVGVeynryX66iZZ9U8pi2w0kru3G6WGHbXcndiJu_PbEF9e6G0AAcvERP3XOaCgYKAUwSARYSFQHGX2Mi8uU3N8ULoAqY7y7px0_ArQ0175\",\n  \"Content-Type\": \"application/json\"\n}",
+        "jsonHeaders": "={\n  \"Authorization\": \"Bearer TU_TOKEN\",\n  \"Content-Type\": \"application/json\"\n}",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{$json[\"sheetData\"]}}",
