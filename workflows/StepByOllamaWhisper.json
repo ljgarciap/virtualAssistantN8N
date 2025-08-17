@@ -1,0 +1,504 @@
+{
+  "name": "StepByOllamaWhisper",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 1,
+              "unit": "minutes"
+            }
+          ]
+        }
+      },
+      "name": "Polling Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        -1312,
+        -736
+      ],
+      "id": "8f749319-faf5-41af-bbd0-e6790801ff3c"
+    },
+    {
+      "parameters": {
+        "url": "https://api.telegram.org/botTOKEN_BOT/getUpdates?timeout=1&offset={{($node['Debug Parse'].json['lastUpdateId'] || 0}}",
+        "options": {}
+      },
+      "name": "Get Telegram Updates",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -1152,
+        -576
+      ],
+      "id": "0007c4a8-4fd2-483b-abab-8f2b2778c684"
+    },
+    {
+      "parameters": {
+        "functionCode": "console.log('RAW UPDATES:', JSON.stringify($input.all(), null, 2));\nreturn $input.all();"
+      },
+      "name": "Debug Raw Updates",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -1280,
+        -272
+      ],
+      "id": "cf003d8b-f45f-48ad-8653-e3162a00cc7f"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Validación inicial\nif (!$input || !$input.all || !$input.all()[0] || !$input.all()[0].json) {\n  return [];\n}\n\nconst updates = $input.all()[0].json.result || [];\nif (!updates.length) return [];\n\nconst lastUpdateId = updates[updates.length - 1].update_id + 1;\nconst output = [];\n\nfor (const update of updates) {\n  try {\n    if (!update.message) continue;\n\n    const chatId = update.message.chat?.id;\n    if (chatId) {\n      $workflow.variables.set('activeChatId', chatId);\n    }\n    \n    const message = {\n      updateId: update.update_id,\n      chatId: chatId,\n      userId: update.message.from?.id || 0,\n      username: (update.message.from?.username || update.message.from?.first_name || 'Unknown').toString().trim(),\n      date: new Date((update.message.date || 0) * 1000).toISOString(),\n      lastUpdateId,\n      // Mantener también en los datos normales como respaldo\n      telegramData: {\n        chatId: chatId,\n        username: (update.message.from?.username || update.message.from?.first_name || 'Unknown').toString().trim()\n      }\n    };\n\n    if (update.message.text) {\n      output.push({\n        json: {\n          ...message,\n          type: 'text',\n          content: (update.message.text || '').toString().trim()\n        }\n      });\n    } else if (update.message.voice) {\n      output.push({\n        json: {\n          ...message,\n          type: 'voice',\n          fileId: (update.message.voice.file_id || '').toString(),\n          duration: update.message.voice.duration || 0\n        }\n      });\n    }\n  } catch (error) {\n    console.log('Error parsing update:', error);\n    continue;\n  }\n}\n\nconsole.log('PARSED MESSAGES:', JSON.stringify(output, null, 2));\nreturn output;"
+      },
+      "name": "Parse Messages",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -1104,
+        -272
+      ],
+      "id": "001d807f-dc1f-43a6-99b0-8827f612a6de"
+    },
+    {
+      "parameters": {
+        "functionCode": "console.log('PARSED DATA:', JSON.stringify($input.all(), null, 2));\nreturn $input.all();"
+      },
+      "name": "Debug Parse",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -944,
+        -272
+      ],
+      "id": "f20cfd8e-6611-4533-a23a-0f9181334fdd"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.type}}",
+              "value2": "text"
+            }
+          ]
+        }
+      },
+      "name": "Is Text?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -816,
+        -528
+      ],
+      "id": "f2a116a4-659b-4828-9ae4-abd4e47f32df"
+    },
+    {
+      "parameters": {
+        "functionCode": "console.log('TEXT TO OLLAMA:', $input.all()[0]?.json?.content);\nreturn $input.all();"
+      },
+      "name": "Debug Text Path",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -576,
+        -736
+      ],
+      "id": "1e274de1-d756-4eac-b28d-b3bf1b9597e2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.type}}",
+              "value2": "voice"
+            }
+          ]
+        }
+      },
+      "name": "Is Voice?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -1296,
+        -64
+      ],
+      "id": "58202625-ab35-49c7-82f4-4a46cedbdb8d"
+    },
+    {
+      "parameters": {
+        "url": "https://api.telegram.org/botTOKEN_BOT/getFile?file_id={{$json.fileId}}",
+        "options": {}
+      },
+      "name": "Get Voice File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -1024,
+        -80
+      ],
+      "id": "aaefc21c-5559-457a-937f-234477a0a590"
+    },
+    {
+      "parameters": {
+        "functionCode": "console.log('AUDIO FILE METADATA:', $input.all()[0]?.json);\nreturn $input.all();"
+      },
+      "name": "Debug Audio Metadata",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -832,
+        96
+      ],
+      "id": "dbba8c42-d89c-443d-bd08-e69902041a09"
+    },
+    {
+      "parameters": {
+        "url": "https://api.telegram.org/file/botTOKEN_BOT/{{$json.result.file_path}}",
+        "options": {}
+      },
+      "name": "Download Voice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -640,
+        272
+      ],
+      "id": "b7f4bb49-17e4-47b5-ab71-6e860631d369"
+    },
+    {
+      "parameters": {
+        "functionCode": "console.log('AUDIO FILE DOWNLOADED:', $binary['audioFile']?.data?.length);\nreturn $input.all();"
+      },
+      "name": "Debug Audio Download",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -480,
+        96
+      ],
+      "id": "8d467958-6024-479b-8e6c-58798da2124a"
+    },
+    {
+      "parameters": {
+        "url": "http://whisper:9000/asr",
+        "options": {}
+      },
+      "name": "Transcribe Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -336,
+        288
+      ],
+      "id": "62e5d54e-45e4-4f6c-aa20-c8528f819336"
+    },
+    {
+      "parameters": {
+        "functionCode": "console.log('TRANSCRIPTION RESULT:', $input.all()[0]?.json);\nreturn $input.all();"
+      },
+      "name": "Debug Transcription",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -160,
+        -64
+      ],
+      "id": "64235962-205d-4861-bdb3-6fcee2c31f07"
+    },
+    {
+      "parameters": {
+        "functionCode": "const input = $input.all()[0].json;\n\nreturn [\n  {\n    json: {\n      ...input,\n      ollamaPayload: {\n        model: \"mistral\",\n        prompt: input.type === 'voice' \n          ? `Responde a este mensaje de voz transcrito: ${input.transcription}`\n          : `Responde a este mensaje de texto: ${input.content}`,\n        stream: false\n      },\n      _metadata: {  // Datos que preservaremos\n        telegramData: {\n          chatId: input.chatId,\n          username: input.username\n        }\n      }\n    }\n  }\n];"
+      },
+      "name": "Prepare Ollama Input",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        32,
+        -256
+      ],
+      "id": "a3badf6a-e7c1-443b-b82e-308b464a5b13"
+    },
+    {
+      "parameters": {
+        "functionCode": "console.log('OLLAMA RESPONSE:', $input.all()[0]?.json);\nreturn $input.all();"
+      },
+      "name": "Debug Ollama Output",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        448,
+        -256
+      ],
+      "id": "d1c79b59-0bda-41e1-a630-338ba16595ab"
+    },
+    {
+      "parameters": {
+        "chatId": "=={{$workflow.variables.activeChatId}}`",
+        "text": "={{$json.body.response}}",
+        "additionalFields": {}
+      },
+      "name": "Send Telegram Reply",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        672,
+        -272
+      ],
+      "id": "af294ab9-0787-4a6c-b5de-79aea52ea24d",
+      "webhookId": "12a1ccd1-c605-4c15-bf46-c608b19921a4",
+      "credentials": {
+        "telegramApi": {
+          "id": "X0XhEZPDLpmp4d2o",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ollama:11434/api/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"mistral\",\n  \"prompt\": \"={{$json.ollamaPayload.prompt}}\",\n  \"stream\": false\n}",
+        "options": {
+          "allowUnauthorizedCerts": true,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        -256
+      ],
+      "id": "699e0c9e-b403-442e-95d8-91996486a64f",
+      "name": "HTTP Request",
+      "alwaysOutputData": false
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Polling Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Telegram Updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Telegram Updates": {
+      "main": [
+        [
+          {
+            "node": "Debug Raw Updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Debug Raw Updates": {
+      "main": [
+        [
+          {
+            "node": "Parse Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Messages": {
+      "main": [
+        [
+          {
+            "node": "Debug Parse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Debug Parse": {
+      "main": [
+        [
+          {
+            "node": "Is Text?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Text?": {
+      "main": [
+        [
+          {
+            "node": "Debug Text Path",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Debug Text Path": {
+      "main": [
+        [
+          {
+            "node": "Prepare Ollama Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Voice?": {
+      "main": [
+        [
+          {
+            "node": "Get Voice File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Voice File": {
+      "main": [
+        [
+          {
+            "node": "Debug Audio Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Debug Audio Metadata": {
+      "main": [
+        [
+          {
+            "node": "Download Voice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Voice": {
+      "main": [
+        [
+          {
+            "node": "Debug Audio Download",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Debug Audio Download": {
+      "main": [
+        [
+          {
+            "node": "Transcribe Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe Audio": {
+      "main": [
+        [
+          {
+            "node": "Debug Transcription",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Debug Transcription": {
+      "main": [
+        [
+          {
+            "node": "Prepare Ollama Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Ollama Input": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Debug Ollama Output": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Telegram Reply": {
+      "main": [
+        []
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Debug Ollama Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f0c3b98c-fed1-400b-948d-f0c289912e97",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "fb4c41af314f454c812d24f38706cb30e6684656925d60c6cd198c8a97ca38c0"
+  },
+  "id": "lzrMiF7nphp0CCl5",
+  "tags": []
+}

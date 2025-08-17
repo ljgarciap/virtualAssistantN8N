@@ -1,0 +1,261 @@
+{
+  "name": "OllamaWhisper",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 1,
+              "unit": "minutes"
+            }
+          ]
+        }
+      },
+      "name": "Polling Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        64
+      ],
+      "id": "a5badda5-1d4b-467c-94cd-df8fcb7eae1c"
+    },
+    {
+      "parameters": {
+        "url": "https://api.telegram.org/botTOKEN_BOT/getUpdates?timeout=1&offset={{($node['Parse Messages'].json['lastUpdateId'] || 0)}}",
+        "options": {}
+      },
+      "name": "Get Telegram Updates",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -272,
+        64
+      ],
+      "id": "80db2d4c-1d26-42ce-9ebf-3bd8760cc52b"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Validación inicial mejorada\nif (!$input || !$input.all || !$input.all()[0] || !$input.all()[0].json) {\n  return [];\n}\n\nconst updates = $input.all()[0].json.result || [];\nif (!updates.length) return [];\n\nconst lastUpdateId = updates[updates.length - 1].update_id + 1;\nconst output = [];\n\nfor (const update of updates) {\n  try {\n    if (!update.message) continue;\n    \n    const message = {\n      updateId: update.update_id,\n      chatId: update.message.chat?.id || 0,\n      userId: update.message.from?.id || 0,\n      username: (update.message.from?.username || update.message.from?.first_name || 'Unknown').toString().trim(),\n      date: new Date((update.message.date || 0) * 1000).toISOString(),\n      lastUpdateId\n    };\n    \n    if (update.message.text) {\n      output.push({\n        json: {\n          ...message,\n          type: 'text',\n          content: (update.message.text || '').toString().trim()\n        }\n      });\n    } else if (update.message.voice) {\n      output.push({\n        json: {\n          ...message,\n          type: 'voice',\n          fileId: (update.message.voice.file_id || '').toString(),\n          duration: update.message.voice.duration || 0\n        }\n      });\n    }\n  } catch (error) {\n    continue;\n  }\n}\n\nreturn output;"
+      },
+      "name": "Parse Messages",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        64
+      ],
+      "id": "b39c06e0-9910-4206-b915-62c85c6d2ccf"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json && $json.type}}",
+              "value2": "voice"
+            }
+          ]
+        }
+      },
+      "name": "Is Voice Message?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        144,
+        64
+      ],
+      "id": "632b3b53-4906-467d-9429-720be962e1a8"
+    },
+    {
+      "parameters": {
+        "url": "https://api.telegram.org/botTOKEN_BOT/getFile?file_id={{$json.fileId}}",
+        "options": {}
+      },
+      "name": "Get Voice File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        368
+      ],
+      "id": "5b3a0954-c4f0-4fe9-a990-8d193bf8a012"
+    },
+    {
+      "parameters": {
+        "url": "https://api.telegram.org/file/botTOKEN_BOT/{{$json.result.file_path}}",
+        "options": {}
+      },
+      "name": "Download Voice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        96,
+        368
+      ],
+      "id": "a6d24d5f-600a-469c-9575-1bbba3bb69a5"
+    },
+    {
+      "parameters": {
+        "url": "http://whisper:9000/asr",
+        "options": {}
+      },
+      "name": "Transcribe Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        352,
+        368
+      ],
+      "id": "2a6a4850-e686-46a6-a1ac-f63e60951b14"
+    },
+    {
+      "parameters": {
+        "url": "http://ollama:11434/api/generate",
+        "options": {
+          "fullResponse": true
+        }
+      },
+      "name": "Process with Ollama",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        528,
+        80
+      ],
+      "id": "f50dc734-37e6-4e4b-88cf-8c832058ca06"
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json.chatId}}",
+        "text": "={{$node['Process with Ollama'].json['response'] || 'No response from AI'}}",
+        "additionalFields": {}
+      },
+      "name": "Send Telegram Reply",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        736,
+        160
+      ],
+      "id": "b7c4291f-87da-467d-a088-4e13f56dc9a0",
+      "webhookId": "f1c7e34d-c6cb-47e9-9901-d3c6b7ea03d8",
+      "credentials": {
+        "telegramApi": {
+          "id": "X0XhEZPDLpmp4d2o",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Polling Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Telegram Updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Telegram Updates": {
+      "main": [
+        [
+          {
+            "node": "Parse Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Messages": {
+      "main": [
+        [
+          {
+            "node": "Is Voice Message?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Voice Message?": {
+      "main": [
+        [
+          {
+            "node": "Get Voice File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Process with Ollama",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Voice File": {
+      "main": [
+        [
+          {
+            "node": "Download Voice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Voice": {
+      "main": [
+        [
+          {
+            "node": "Transcribe Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe Audio": {
+      "main": [
+        [
+          {
+            "node": "Process with Ollama",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process with Ollama": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f4fbcc43-adb6-43f2-bbae-2d32ebe4a737",
+  "meta": {
+    "instanceId": "fb4c41af314f454c812d24f38706cb30e6684656925d60c6cd198c8a97ca38c0"
+  },
+  "id": "QtsmS8Wfh0BmrDZF",
+  "tags": []
+}

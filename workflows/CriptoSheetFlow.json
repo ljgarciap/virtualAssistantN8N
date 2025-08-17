@@ -1,0 +1,172 @@
+{
+  "name": "CriptoSheet",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd",
+        "options": {}
+      },
+      "name": "Get Crypto Prices (USD)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        0
+      ],
+      "id": "dc5e7f15-4267-4ad1-b0c3-68f4bb3a839e"
+    },
+    {
+      "parameters": {
+        "url": "https://api.exchangerate-api.com/v4/latest/USD",
+        "options": {}
+      },
+      "name": "Get USD to COP Rate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        208,
+        0
+      ],
+      "id": "9a50136f-f396-4dfc-9e2b-73478c78004d"
+    },
+    {
+      "parameters": {
+        "functionCode": "const rates = items[0].json.rates;\nconst rateCOP = rates.COP;\nconst now = new Date().toISOString();\n\nreturn [\n  {\n    json: {\n      date: now,\n      USD_to_COP: rateCOP,\n      // Puedes añadir más conversiones si lo necesitas\n      EUR_to_COP: (rates.EUR * rateCOP).toFixed(2),\n    }\n  }\n];"
+      },
+      "name": "Transform Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        400,
+        0
+      ],
+      "id": "5421d2dc-9b06-4917-b987-3ac13746f59b"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -272,
+        0
+      ],
+      "id": "84f00fb0-5473-4af0-9a81-3cfb0a60c97b",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sheets.googleapis.com/v4/spreadsheets/SPREADSHEET_ID/values/'Hoja 1'!A:A:append?valueInputOption=USER_ENTERED",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "={\n  \"Authorization\": \"Bearer ya29.a0AS3H6NzIqWFXWvc0ERHgDU5A_ouAnvEXWswsJbeOngXfqTY4C__wF64PnixEeVXhb6JaXg9wr_dkR2twsxwdQSjkRFi36L6kCfmA6PgMd9zKCVGVeynryX66iZZ9U8pi2w0kru3G6WGHbXcndiJu_PbEF9e6G0AAcvERP3XOaCgYKAUwSARYSFQHGX2Mi8uU3N8ULoAqY7y7px0_ArQ0175\",\n  \"Content-Type\": \"application/json\"\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json[\"sheetData\"]}}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        784,
+        0
+      ],
+      "id": "1875d269-62d7-4085-abf7-b5501994eb4f",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Convierte los datos de entrada al formato que espera Google Sheets\nconst inputData = $input.all()[0].json;\n\nreturn [{\n  json: {\n    // Estructura requerida por Google Sheets API\n    sheetData: {\n      values: [\n        // Fila 1: Encabezados (opcional)\n        [\"Fecha\", \"USD a COP\", \"EUR a COP\"],\n        \n        // Fila 2: Tus datos\n        [\n          inputData.date,          // Columna A (Fecha)\n          inputData.USD_to_COP,    // Columna B (Número)\n          inputData.EUR_to_COP     // Columna C (Texto)\n        ]\n      ]\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        592,
+        0
+      ],
+      "id": "28eb1523-dace-4087-8181-6295b47402da",
+      "name": "Preparing data"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get Crypto Prices (USD)": {
+      "main": [
+        [
+          {
+            "node": "Get USD to COP Rate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get USD to COP Rate": {
+      "main": [
+        [
+          {
+            "node": "Transform Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform Data": {
+      "main": [
+        [
+          {
+            "node": "Preparing data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get Crypto Prices (USD)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        []
+      ]
+    },
+    "Preparing data": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "efa1d59b-476d-41cf-86de-688bcfedd570",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "fb4c41af314f454c812d24f38706cb30e6684656925d60c6cd198c8a97ca38c0"
+  },
+  "id": "x9ktLzdaONSZGccd",
+  "tags": []
+}

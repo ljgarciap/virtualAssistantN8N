@@ -77,8 +77,8 @@
     },
     {
       "parameters": {
-        "fromEmail": "danielau@softclass.co",
-        "toEmail": "piedecuestadigital@gmail.com",
+        "fromEmail": "correo@tudominio.com",
+        "toEmail": "correoenvio@dominio.com",
         "subject": "Mensaje desde Ollama NDJSON",
         "text": "={{$json[\"text\"]}}",
         "options": {}

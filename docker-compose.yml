@@ -1,21 +1,88 @@
 services:
   ollama:
-    build: .
+    build:
+      context: ./ollama
+    container_name: ollama
     ports:
-      - "${OLLAMA_PORT}:11434"
+      - "${OLLAMA_PORT:-11434}:11434"
     environment:
-      - OLLAMA_MODEL=${OLLAMA_MODEL}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-mistral}
     volumes:
-      - ./ollama_data:/root/.ollama
+      - ollama_data:/root/.ollama
+    networks:
+      - n8n_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 5s
+      retries: 3  
 
   n8n:
-    image: n8nio/n8n
+    build:
+      context: ./n8n
+    container_name: n8n
     ports:
-      - "${N8N_PORT}:5678"
+      - "${N8N_PORT:-5678}:5678"
     environment:
-      - N8N_HOST=n8n
-      - N8N_PORT=5678
-      - N8N_PROTOCOL=http
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=${N8N_PORT:-5678}
+      - N8N_PROTOCOL=${N8N_PROTOCOL:-https}
+      - N8N_SSL_CERT=/home/node/certs/cert.pem
+      - N8N_SSL_KEY=/home/node/certs/key.pem
       - NODE_ENV=production
+      - N8N_DB_TYPE=sqlite
+      - DB_SQLITE_VACUUM_ON_STARTUP=true
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=false
     volumes:
-      - ${N8N_DATA}:/home/node/.n8n
+      - n8n_data:/home/node/.n8n
+      - ./certs:/home/node/certs:ro
+      - ./n8n/scripts:/home/node/scripts  # Scripts personalizados de n8n
+    networks:
+      - n8n_net
+    depends_on:
+      ollama:
+        condition: service_healthy
+      whisper:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5678/rest/healthz"]
+      interval: 1m
+      timeout: 10s
+      start_period: 2m
+
+  whisper:
+    build:
+      context: ./whisper
+    container_name: whisper
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./whisper/transcribe.py:/app/transcribe.py
+    environment:
+      - WHISPER_MODEL=${WHISPER_MODEL:-small}
+    networks:
+      - n8n_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sSf http://localhost:9000/asr || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 2m
+
+volumes:
+  n8n_data:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: "${PWD}/n8n_data"  # Persistencia en host
+  ollama_data:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: "${PWD}/ollama_data"  # Persistencia en host
+
+networks:
+  n8n_net:
+    driver: bridge
