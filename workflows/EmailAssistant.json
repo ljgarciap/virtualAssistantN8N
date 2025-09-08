@@ -1,0 +1,270 @@
+{
+  "name": "Procesamiento Correos con Ollama",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {},
+        "options": {}
+      },
+      "id": "b1e3f5a7-c9d0-4e2f-8b1a-3c5d7e9f0a2b",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "resource": "messageAttachment",
+        "messageId": "={{ $json.id }}",
+        "attachmentId": "={{ $json.payload.parts.filter(part => part.body && part.body.attachmentId)[0].body.attachmentId }}",
+        "options": {
+          "download": true
+        }
+      },
+      "id": "c2f4g6b8-d0e1-5f3g-9c2b-4d6f8g0b3d5f",
+      "name": "Get Attachment",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "model": "mistral",
+        "prompt": "={{ \"Analiza este asunto de correo: '\" + $json.payload.headers.find(h => h.name === 'Subject').value + \"'. ¿Contiene palabras relacionadas con reportes, datos, excel o procesamiento? Responde solo SI o NO.\" }}"
+      },
+      "id": "d3g5h7c9-e1f2-6g4h-0d3c-5e7g9h1c4e6g",
+      "name": "Analyze Subject",
+      "type": "n8n-nodes-base.ollama",
+      "typeVersion": 1,
+      "position": [
+        680,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition1",
+              "leftValue": "={{ $('Analyze Subject').item.json.response.trim().toUpperCase() }}",
+              "rightValue": "SI",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "e4h6i8d0-f2g3-7h5i-1e4d-6f8h0i2d5f7h",
+      "name": "Check Valid Email",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileFormat": "xlsx",
+        "binaryPropertyName": "data",
+        "options": {
+          "headerRow": true
+        }
+      },
+      "id": "f5i7j9e1-g3h4-8i6j-2f5e-7g9i1j3e6g8i",
+      "name": "Read Excel",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process Excel data\nconst inputData = $input.all();\nconst outputData = [];\n\nfor (const item of inputData) {\n  const rowData = item.json;\n  \n  // Parse numbers safely\n  const precio = parseFloat(rowData.precio || '0') || 0;\n  const cantidad = parseFloat(rowData.cantidad || '0') || 0;\n  \n  // Calculate totals\n  const subtotal = precio * cantidad;\n  const iva = subtotal * 0.16;\n  const total = subtotal + iva;\n  \n  // Create output item\n  outputData.push({\n    json: {\n      ...rowData,\n      subtotal: Math.round(subtotal * 100) / 100,\n      iva: Math.round(iva * 100) / 100,\n      total: Math.round(total * 100) / 100\n    }\n  });\n}\n\nreturn outputData;"
+      },
+      "id": "g6j8k0f2-h4i5-9j7k-3g6f-8h0j2k4f7h9j",
+      "name": "Process Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileFormat": "xlsx",
+        "binaryPropertyName": "processed_data",
+        "options": {
+          "headerRow": true
+        }
+      },
+      "id": "h7k9l1g3-i5j6-0k8l-4h7g-9i1k3l5g8i0k",
+      "name": "Create Excel",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "reply",
+        "messageId": "={{ $('Gmail Trigger').item.json.id }}",
+        "subject": "Procesamiento Completado - Resultados",
+        "message": "Estimado usuario,\n\nSe ha completado el procesamiento de su archivo Excel.\n\nEn adjunto encontrará el archivo con los cálculos realizados.\n\nSaludos cordiales.",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {
+                "property": "processed_data"
+              }
+            ]
+          }
+        }
+      },
+      "id": "i8l0m2h4-j6k7-1l9m-5i8h-0j2l4m6h9j1l",
+      "name": "Send Reply",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        300
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "j9m1n3i5-k7l8-2m0n-6j9i-1k3m5n7i0k2m",
+      "name": "No Action",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        900,
+        500
+      ]
+    }
+  ],
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Attachment": {
+      "main": [
+        [
+          {
+            "node": "Analyze Subject",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Subject": {
+      "main": [
+        [
+          {
+            "node": "Check Valid Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Valid Email": {
+      "main": [
+        [
+          {
+            "node": "Read Excel",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Excel": {
+      "main": [
+        [
+          {
+            "node": "Process Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Data": {
+      "main": [
+        [
+          {
+            "node": "Create Excel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Excel": {
+      "main": [
+        [
+          {
+            "node": "Send Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2024-12-09T12:00:00.000Z",
+  "versionId": ""
+}
